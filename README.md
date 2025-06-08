@@ -104,7 +104,7 @@ docker image pull ozgurozturknet/hello-app  //burada ilk katman için Already ex
 docker volume create ilkvolume
 docker volume inspect ilkvolume
 ```
-- ```docker container run -it -v ilkvolume:/uygulama alpine sh``` -it ile interaktif bağlantı , -v ile volume bağlamak için , : volume'u hangi klasöre bağlamak istediğim , alpine imajını kullan , sh ile shell aç
+- ```docker container run -it -v ilkvolume:/uygulama alpine sh``` -it ile interaktif bağlantı , -v ile volume bağlamak için , : volume'u hangi klasöre bağlamak istediğim , alpine imajını kullan , sh ile shell aç ** ``` -v <VolumeName>:<ContainerİçindekiKlasör> ``` **
 ```
 cd /uygulama
 touch abc.txt
@@ -127,3 +127,44 @@ echo "test" >> buucuncu.txt // diğer container'ın shellinde bu işlemi yaptım
 cat buucuncu.txt //test yazısını görebildim
 ```
 - bir volume'u birden fazla container'a aynı anda bağlayabildim.
+- ```docker container run -it -v ilkvolume:/deneme3:ro centos sh``` read only olduğu için deneme3 klasörü içinde dosya oluşturamam.
+#### Docker Volume: Boş-Dolu Volume Davranışı
+- Volume sadece container'a değil image içerisinde mevcut bir klasöre de mount edilebilir.
+- 1. Klasör boşsa volume içerisindeki dosyalar klasörde görünür. 2. Klasör dolu, volume boş ise klasördeki dosyalar volume'e kopyalanır. 3. Klasör boş dolu fark etmez, volume doluysa volume'deki dosyaları klasör içinde görürüz.
+- ```docker container run --rm -it ozgurozturknet/adanzyedocker sh``` container durdurulduğunda silinir --rm opsiyonu sayesinde
+```
+docker volume create deneme1
+docker container run --rm -it -v deneme1:/test ozgurozturknet/adanzyedocker sh
+cd /
+ls
+cd test
+ls 
+```
+- deneme1 adında volume oluşturduk, container içindeki test klasörüne mount ettik. (boş bir dosyaya mount ettim)
+``` 
+docker container run --rm -it -v deneme1://usr/src/myapp ozgurozturknet/adanzyedocker sh
+
+docker container run --rm -it -v deneme1:/xyz alpine sh //yeni yaratılacak bir folder'a mount ediyorum
+ls
+cd /xyz
+ls // klasördeki dosyanın bu volume'a kopyalandığını gördük
+touch adanzyedocker.txt
+```
+- boş olan volume'u dolu klasöre mount ettik. myapp içindeki tüm dosyalar volume'e kopyalandı.
+```
+docker container run --rm -it -v deneme1://usr/src/myapp ozgurozturknet/adanzyedocker sh
+ls  //  adanzyedocker.txt  app1.class         app1.java
+```
+- dolu bir volume'u dolu bir dosyaya mount ettik. volume'un içerisinde ne varsa dosyanın içinde de onu gördük, dosyanın boş/dolu olması fark etmez
+#### Bind Mounts
+- Host üzerindeki bir klasör ya da dosyayı Container içerisine map edebiliriz.
+```
+docker container run -d -p 80:80 --name ilkweb nginx  //web sunucu oluşturduk
+docker exec -it 65c sh  //container'a bağlandık
+cd /usr/share/nginx/html
+ls
+cat index.html
+```
+```
+docker container run -d -p 80:80 -v /Users/selinguler/Documents/GitHub/AdanZyeDocker/kisim3/bolum28/websitesi:/usr/share/nginx/html nginx
+```
