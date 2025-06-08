@@ -209,3 +209,92 @@ docker container run -d --name websunucu1 -p 80:80 -v /Users/selinguler/Desktop/
 ```
 
 ## Container 102
+#### Docker Network Driver
+- Bridge: varsayılan
+- Host: network izolasyonu olmadan çalışmasına ihtiyaç duyduğumuz zaman kullanırız, her sistemde bulunur, sanki o host üzerinde çalışan bir process'miş gibi host'un ağ kaynaklarını kullanır
+- Macvlan: container'lar fiziksel ağlara birer fiziksel ağ adaptörüne sahipmişçesine bağlanabilirler
+- Overlay: 5 farklı Docker sunucu var % farklı container var, aynı anda çalışıyormuş gibi çalışmasını istediğim zaman bunu kullanıyorum
+#### Docker Network Objeleri - 1
+- ```docker network ls```
+- ```docker network inspect bridge```
+- bir container oluşturdum ```docker exec -it <CONTAINER_ID> sh``` ```ifconfig``` dediğimde çıkan inet addr = bridge'inki ile aynı
+- Docker Engine kurulduğunda 3 tane network objesi (bridge, host, none) yaratılır
+- ```docker container run -it --name deneme ozgurozturknet/adanzyedocker sh``` yeni bir container yaratıp bu container'ın içinden az öncekine erişebildim ```ping 172.17.0.2``` aynı bridge network'e bağlı container'lar birbirleriyle direkt haberleşebilirler
+- bridge'te ifconfig dediğim zaman eth0 ve lo ; host'ta ifconfig dediğim zaman docker0, eth0, eth1 ve lo geliyor. host üzerine bağlı olduğu sistemin direkt altyapısını kullanıyor. none'da ifconfig dendiğinde sadece lo geliyor ve ping'lemeye çalıştığımızda network unreachable oluyor.
+#### Docker Network Objeleri - 2 - Port Publish
+- Port publish: dış dünyadan container içerisindeki servise erişmede kullanılır. Bu yaklaşımda container hangi port'tan dinliyorsa onu fiziksel port ile eşleştiriyoruz. Böylece belirlenmiş port'tan gelen istekler container'ın port'una iletiliyor. -p parametresi ile
+- ```-p <HostPort>:<ContainerPort>``` ```docker container run -d --publish 8080:80 -p 53:53/udp ozgurozturknet/adanzyedocker```
+#### Docker Network Objeleri - 3
+- Kullanıcı Tanımlı Bridge: container'lar arasında network izolasyonu (iki farklı bridge oluşturmak mesela), Kullanıcı tanımlı bridge network'e bağlı container'lar birbirleriyle isimler üzerinden haberleşebilirler. Dns çözümlemesi sağlar, Container'lar çalışır durumdayken de kullanıcı tanımlı bridge network'lere bağlanıp, bağlantıyı kesebilirler
+```
+docker container run -d --name websunucu ozgurozturknet/adanzyedocker
+docker container run -it -d --name database1 ozgurozturknet/adanzyedocker sh
+/usr/src/myapp # ping websunucu //id üzerinden erişebilirim ama isim üzerinden erişemiyorum burada bunu gördük
+
+docker network create kopru1
+docker container run -dit --name websunucu --net kopru1 ozgurozturknet/adanzyedocker sh  //-dit yaptığım için terminal bağlantısını kurdu fakat direkt container'ın içine girmedi istediğim zaman bağlanabiliim
+docker container run -dit --name database --net kopru1 ozgurozturknet/adanzyedocker sh
+
+docker attach websunucu // attach ile container'a bağlandım şu an container'ın içerisindeyim
+/usr/src/myapp # ping database //aynı kullanıcı tanımlı bridge network2e bağlı oldukları için isimleriyle haberleşebililyorlar
+
+
+docker network create --driver=bridge --subnet=10.10.0.0/16 --ip-range=10.10.10.0/24 --gateway=10.10.10.10 kopru2 //bridge'ın ağ özelliklerini belirledim
+
+//kullanıcı tanımlı bridge'lere container'lar çalışırken bağlanabilir
+docker network connect kopru2 database
+docker attach database //database container'a bağlandım
+ifconfig //çalıştırdığımda eth0 ve eth1 gördüm. bir container birden fazla network'e de aynı anda bağlanabilir.
+
+docker network disconnect kopru2 database //bağlantıyı kestik
+docker network rm kopru1 //kopru1'e container bağlı olduğu için silemedim
+docker network rm kopru2
+```
+#### Logging
+- ```# cd var/log/nginx #ls access.log error.log ```
+```
+docker container run -d --name appbir ozgurozturknet/app1 //terminalleri birbirine bağlamadığımız için ekranda mesajı göremedik fakat mesaj oluştu
+docker logs appbir  //ile şu ana kadar oluşturulmuş logları görüyoruz
+
+docker container run -d --name con1 -p 80:80 nginx
+docker logs con1
+```
+#### Docker Logs
+```
+docker container run -d --name con1 -p 80:80 nginx
+docker logs --details con1
+docker logs -t con1  //--until ve --since , --tail 3 parametreleri de var
+docker logs -f con1  // tekrar console'a geri dönmez, logları canlı olarak takip edebilirim
+
+docker container run --log-driver splunk nginx //json yerine farklı bir logging driver atayabiliyorum
+```
+#### Docker Stats ve Top
+```
+docker top con1 //container'da çalışan process'leri listeler
+docker stats  // host'un üzerinde çalışan tüm container'ları listeler, CPU% | MEM USAGE | MEM% | NET I/O | BLOCK I/O | PIDS'i görebiliriz
+docker stats con1
+```
+#### Container Cpu ve Memory Limitleri
+- sistem kaynaklarınının kullanımına sınır getirmek
+- --memory = <LIMIT>
+```
+docker container run -d --memory=100m ozgurozturknet/adanzyedocker
+docker container run -d --memory=100m --memory-swap=200m ozgurozturknet/adanzyedocker // alan aşılmışsa bile swap olarak 200mb daha kullanabilir
+
+docker container run -d --cpus="1.5" ozgurozturknet/adanzyedocker  //toplam core'ların 1.5 tanesini kullan
+docker container run -d --cpus="1.5" --cpuset-cpus="0,3" ozgurozturknet/adanzyedocker //0 ve 3. core'u kullan
+```
+#### Environment Variables
+- ```Get-ChildItem Env: ``` tüm env variable'ları listeledik
+- ```$Env:TEMP``` temp'in değerine bakmak için
+- ```$Env:test = "denemedir"``` biz tanımladık
+- ```printenv``` ```echo$TEMP``` ```export test = "denemedir"``` Linux için
+#### Docker Environment Variables 
+- image ya da container yaratılırken tanımlanır
+- ```docker container run -it --env VAR1=deneme1 --env VAR2=deneme2 ubuntu bash``` --env VARIABLE = değer , -e VARIABLE = değer
+- çalıştığı host üzerindeki env variable'ın değerini container içerisine aktarmak  ```docker container run -it --env TEMP ubuntu bash``` ```printenv```
+- ```docker container run -it --env-file ./env.list ubuntu bash``` --env-file dosya_ismi, dosyanın içindeki env değerlerini dosya üzerinden container'a attık (bunu envlist'in bulunduğu dosyanın içindeyken yaptık)
+```
+docker container run --env veritabani=testveritabani.pizzadukkani.com ozgurozturknet/env1
+docker container run --env veritabani=prod.pizzadukkani.com ozgurozturknet/env1
+```
