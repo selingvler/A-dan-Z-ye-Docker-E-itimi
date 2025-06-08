@@ -3,6 +3,7 @@
 ## İçindekiler
 - [Giriş](#giriş)
 - [Container 101](#container-101)
+- [Container 102](#container-102)
 
 ## Giriş
 #### İşletim Sistemi
@@ -168,3 +169,43 @@ cat index.html
 ```
 docker container run -d -p 80:80 -v /Users/selinguler/Documents/GitHub/AdanZyeDocker/kisim3/bolum28/websitesi:/usr/share/nginx/html nginx
 ```
+#### Alıştırma
+```
+docker image pull ozgurozturknet/app1
+docker container run ozgurozturknet/app1
+docker container run -d httpd:alpine //sonrasında container'ın id'sini görebilmek için detach
+docker ps
+docker logs 7b4
+docker container stop 7b4
+docker container start 7b4
+docker container rm -f 7b4
+
+docker container run -d -p 80:80 ozgurozturknet/adanzyedocker
+docker container exec -it 425 sh
+cd /usr/local/apache2/htdocs
+echo "denemedir" >> index.html
+docker container rm -f 425
+
+docker container run alpine ls  //varsayılan olarak çalışması gereken uygulama yerine “ls”
+
+docker volume create alistirma1
+docker container run --name birinci -it -v alistirma1:/test alpine
+cd /test
+touch abc.txt
+echo "deneme" >> abc.txt
+cat abc.txt
+
+docker container run --name ikinci -it -v alistirma1:/test alpine
+cd /test
+ls
+cat abc.txt
+
+docker container run --name ucuncu -it -v alistirma1:/test:ro alpine
+cd /test
+ls
+touch abc1.txt //ReadOnly file system
+
+docker container run -d --name websunucu1 -p 80:80 -v /Users/selinguler/Desktop/deneme:/usr/local/apache2/htdocs ozgurozturknet/adanzyedocker
+```
+
+## Container 102
