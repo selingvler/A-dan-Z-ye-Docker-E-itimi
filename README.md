@@ -407,3 +407,23 @@ docker image build -t execshell .
 docker container run --name exec execshell
 docker container run --name shell execshell  //ENV'in değerine erişebildim shell formunda
 ```
+#### Multi-stage Build -1
+- ```docker image build -t javasdk .``` ```docker container run javasdk``` boyutu 250MB'ya yakın
+- ```docker container run --name javauygulama javasdk``` ```docker cp javauygulama:/usr/src/uygulama .```(bolum57 klasörünün içindeydim uygulama -uygulamanın derlenmiş hali- oraya kopyalandı)
+- Dockerfile.jre'de sadece java runtime environment var```docker image build -t javajre -f ./Dockerfile.jre .```
+- kaynak kodu -> jdk ile image -> kodu derle -> container yarat -> container içindeki dosyaları bilgisayara kopyala -> bu dosyaları yaratarak yeniden image yarat
+#### Multi-stage Build -2
+```
+FROM mcr.microsoft.com/java/jdk:8-zulu-alpine AS derleyici  //derleyici adında stage tanımladım
+COPY /source /usr/src/uygulama
+WORKDIR /usr/src/uygulama
+RUN javac uygulama.java
+
+FROM mcr.microsoft.com/java/jre:8-zulu-alpine
+WORKDIR /usr/src/uygulama
+COPY --from=derleyici /usr/src/uygulama .
+CMD ["java", "uygulama"]
+```
+- ``` docker image build -t javason .``` son FROM talimatıyla girdiğimiz komutlar image'ın içinde olur
+- ```COPY --from=derleyici /usr/src/uygulama .``` from kaynağını kendim tanımlamak zorunda değilim
+#### Build ARG 
