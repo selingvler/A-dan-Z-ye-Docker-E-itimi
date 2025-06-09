@@ -5,6 +5,7 @@
 - [Container 101](#container-101)
 - [Container 102](#container-102)
 - [Image ve Registery](#image-ve-registery)
+- [Docker Compose](#docker-compose)
 
 ## Giriş
 #### İşletim Sistemi
@@ -427,3 +428,56 @@ CMD ["java", "uygulama"]
 - ``` docker image build -t javason .``` son FROM talimatıyla girdiğimiz komutlar image'ın içinde olur
 - ```COPY --from=derleyici /usr/src/uygulama .``` from kaynağını kendim tanımlamak zorunda değilim
 #### Build ARG 
+- (bolum59)```docker image build -t uygulama:3.7.6 .``` (Dockerfile'da versiyonu değiiştirip tekrar image yaratabilirim) ```docker image build -t uygulama:3.8.1  .```
+``` 
+FROM ubuntu:latest
+WORKDIR /gecici
+ARG VERSION
+ADD https://www.python.org/ftp/python/${VERSION}/Python-${VERSION}.tgz .
+CMD ls -al
+```
+- ```docker image build -t x1 --build-arg VERSION = 3.7.1 .```  ```docker image build -t x2 --build-arg VERSION = 3.8.1 .```
+- image oluştururken değişkene değer atıyorum, --build-arg, *container içerisinden erişilemez*
+#### Docker Commit
+- (bolum59) ```docker container run -it --name con1 ubuntu:latest bash```
+```
+(container interaktif açtı) mkdir /temp
+cd /temp
+apt-get install wget
+wget https://wordpress.org/latest.tar.gz
+(bolum59) docker commit con1 ozgurozturknet/con1:latest
+docker run -it --name con2 ozgurozturknet/con1:latest bash
+
+docker commit -c 'CMD ["java", "uygulama"]' con1 ozgurozturknet/con1:ikinci  //container oluştururken Dockerfile yerine -c paramaetresi ile CMD girebiliriz
+```
+#### Docker Save - Load
+- internet erişimi yoksa localde oluşturulan image'ı sisteme atabiliriz
+- mkdir image , cd image```docker save ozgurozturknet/con1:latest -o con1imaj.tar ```
+- ```docker load -i ./con1imaj.tar```
+#### Docker Registry
+- local bir image deposu kurmak için
+- dockerHub'tan registry image'ını indiriyorum  ```docker pull registry```
+- ```docker container run -d -p 5000:5000 --restart always --name registry registry``` --restart on-failure, always, no, unless-stopped
+- ```http://127.0.0.1:5000/``` altında çalışır ```http://127.0.0.1:5000/v2/_catalog``` altında kayıtlı repoları gösterir
+- image'a başka bir tag atamak için ```docker image tag ozgurozturknet/hello-app:latest 127.0.0.1:5000/hello-app:latest``` localde duran kendi registery'imde tutmak istiyorum, image'ın duracağı yeri belirledim
+- ```docker image push 127.0.0.1:5000/hello-app:latest``` ```docker image pull 127.0.0.1:5000/hello-app:latest```
+
+## Docker Compose
+##### Docker Compose
+- Compose, çoklu Docker uygulamalarını oluşturmak ve çalıştırmak için kullanılan bir araçtır
+- Compose ile uygulamanın hizmetlerini yapılandırmak için bir YAML dosyası kullanılır
+- Daha sonra tek bir komut ile tüm hizmetleri yapılandırmaya başlar ve sistemi başlatırız
+- Compose production için çok uygun bir araç değildir. Development aşaması için idealdir
+- (bolum65) ```docker-compose up -d``` ```docker compose down```
+#### Docker Compose CLI
+- docker objelerini isimlendirirken; sistemdeki diğer objeler ile çakışmasın diye docker-compose.yml dosyasının bulunduğu klasör adıyla başlayan isimlendirme yapar -> klasorAdi_objeAdi
+- docker-compose down -> tüm servisleri (docker objeleri) kapatır ve siler, her şeyi siler fakat volume'leri silmez
+- ```docker-compose config``` docker-compose.yml dosyasını tersten gösterir
+- ```docker-compose images```  servislerin hangi imajlarla oluştuğunu gösterir
+- ```docker-compose logs``` tüm servislerin loglarını listeler
+- ```docker-compose exec websrv ls -al``` compose ile oluşturduğumuz servisin içinde komut çalıştırır, docker-compose exec <ServiceName> <Command>
+#### Docker Compose Build
+- image'ı compose ayağa kalkarken oluşacak şekilde de ayarlayabiliriz
+- ```build: . ``` aynı dizinde bir Dockerfile olması gerekir, oradan image'ı oluşturur
+- docker-compose down'da image ve volume'ler silinmiyor, bu yüzden image bir kere oluşturuluyor
+- ```docker-compose build ``` image'ı güncelleyebilmek için çünkü docker-compose up image'ı tekrar oluşturmuyor
