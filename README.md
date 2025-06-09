@@ -4,6 +4,7 @@
 - [Giriş](#giriş)
 - [Container 101](#container-101)
 - [Container 102](#container-102)
+- [Image ve Registery](#image-ve-registery)
 
 ## Giriş
 #### İşletim Sistemi
@@ -297,4 +298,112 @@ docker container run -d --cpus="1.5" --cpuset-cpus="0,3" ozgurozturknet/adanzyed
 ```
 docker container run --env veritabani=testveritabani.pizzadukkani.com ozgurozturknet/env1
 docker container run --env veritabani=prod.pizzadukkani.com ozgurozturknet/env1
+```
+
+## Image ve Registery
+#### Docker Image İsimlendirme ve Tag Yapısı
+- Docker imajına verilen isim aynı zamanda o imajın nerede depolandığını da belirtir. image id de aynı sonucu verir
+- ```<RegistryURL>/<repository>:<tag>``` dockerHub RegisteryURL için default, tag versiyonlama için varsayılan latest
+- ```docker image pull gcr.io/google-containers/busybox```
+#### Docker Hub
+- farklı tag'e sahip image'ler aynı id'ye sahip olabilir, tag 5 ve 5.7 aynı mesela
+#### Docker Image Oluşturma - Dockerfile -1
+- FROM
+- RUN | İmaj oluşturulurken shell’de bir komut çalıştırmak istersek bu talimat kullanılır.
+- WORKDIR | cd xxx komutuyla ile istediğimiz klasöre geçmek yerine bu talimat kullanılarak istediğimiz klasöre geçer ve oradan çalışmaya devam ederiz. 
+Ör: WORKDIR /usr/src/app
+- COPY | İmaj içine dosya veya klasör kopyalamak için kullanırız
+Ör: COPY /source /user/src/app
+- EXPOSE | Bu imajdan oluşturulacak containerların hangi portlar üstünden erişilebileceğini yani hangi portların yayınlanacağını bu talimatla belirtirsiniz. 
+Ör: EXPOSE 80/tcp
+- CMD | Bu imajdan container yaratıldığı zaman varsayılan olarak çalıştırmasını istediğiniz komutu bu talimat ile belirlersiniz. 
+Ör: CMD java merhaba
+- HEALTHCHECK | Bu talimat ile Docker'a bir konteynerin hala çalışıp çalışmadığını kontrol etmesini söylebiliriz. Docker varsayılan olarak container içerisinde çalışan ilk processi izler ve o çalıştığı sürece container çalışmaya devam eder. Fakat process çalışsa bile onun düzgün işlem yapıp yapmadığına bakmaz. HEALTHCHECK ile buna bakabilme imkanına kavuşuruz.
+Ör: HEALTHCHECK --interval=5m --timeout=3s CMD curl -f http://localhost/ || exit 1
+#### Docker Image Oluşturma - Dockerfile -2,3
+- kısım 5 bolum48 içinde code. komutuyla vs code'ta açtım, Dockerfile adında dosya ekledim, bu dosyanın içine
+```
+FROM ubuntu:18.04
+RUN apt-get update -y
+RUN apt-get install default-jre -y
+WORKDIR /merhaba
+COPY /myapp .
+CMD ["java","merhaba"]
+```
+Dockerfile'ı kaydettik
+- ```docker image build -t <ImageTag> -f <DockerFileName>``` ```docker image build -t ozgurozturknet/merhaba .```
+- ```docker image history ozgurozturknet/merhaba```
+-  ```docker image push <Image>``` ```docker image push ozgurozturknet/merhaba```   //mounted from library/ubuntu
+#### Docker Image Oluşturma - Dockerfile -4
+- kısım5 bolum50'yi vs code'ta açtık
+- py > DockerFile :
+```
+FROM python:alpine   //base image
+COPY . /app   //bu klasördeki tüm dosyaları, imaj içindeki app folderine kopyala
+WORKDIR /app
+RUN pip install -r requirements.txt  //flask indiriyoruz
+EXPOSE 5000  //container dışından container'a 5000 portundan ulaşılacağını belirtiyoruz
+CMD ["python","app.py"]  //python dosyasını çalıştırıyoruz
+```
+- ```docker image build -t ozgurozturknet/py .```  ```docker container run --rm -p 80:5000 ozgurozturknet/py```
+- nodejs > DockerFile :
+```
+FROM node:10
+
+# Create app directory
+WORKDIR /usr/src/app
+
+# Install app dependencies
+# A wildcard is used to ensure both package.json AND package-lock.json are copied
+# where available (npm@5+)
+COPY package*.json ./
+
+RUN npm install
+# If you are building your code for production
+# RUN npm ci --only=production
+
+# Bundle app source
+COPY server.js .
+EXPOSE 8080
+CMD [ "node", "server.js" ]
+```
+- ```docker image build -t ozgurozturknet/node .```
+- server.js dosyasında değişiklik yaptım ve tekrar image build ettim, COPY server.js . komutuna kadar using cache kullanıldığını gördük, katmanlı yapıdan dolayı
+- daha sık değişen adımları Dockerfile'ın altına koymak isteriz. COPY server.js .altlarda olmalı yani
+#### Linux Shell
+- **echo** komutuyla bir çıktıyı output olarak konsola gönderebiliriz
+- ``` echo $SHELL > deneme.txt```
+- ```./test.sh &``` script arkada çalışmaya devam ediyor fakat aynı anda konsolu da kullanabiliyorum
+- ``` cat abc.txt | grep 3 ``` soldaki komutun çıktısını sağdaki komutun girdisi olarak gönder
+- ```ls ; date``` tek bir satır içinde birden fazla komut işlemek için
+- ```cat abc.txt && ``` cat abc.txt hata döndürmeyeceği için sağdaki komut çalışır
+- ```cat abc.txt || ``` hata olursa sağdaki komutu çalıştır, soldaki düzgün çalışırsa sağdaki komutu çalıştırma
+#### Docker Image Oluşturma - Dockerfile -5
+- image yaratırken kullanıcı ve hostname adında değişken tanımlayacağız ve container başlatıldığında bu kelimeleri değerleri ile değiştireceğiz
+- ```HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD curl -f http://localhost/ || exit 1``` sistemin düzgün çalıştığını ve nginx daemon'ının web sitesini publish etmekte bir sorun yaşamadığını test ediyoruz
+- ```CMD sed -e s/Kullanici/"$KULLANICI"/ Hello_docker.html > index1.html && sed -e s/Hostname/"$HOSTNAME"/ index1.html > index.html ; rm index1.html Hello_docker.html; nginx -g 'daemon off;'``` RUN yerine CMD kullandık çünkü container oluştururken bu değişkenlere değer atanmasını istiyorum
+- ```docker image build -t ozgurozturknet/hello-docker .``` ```docker container run -d --name hello-docker -p 80:80 ozgurozturknet/hello-docker```
+#### Docker Image Oluşturma - Dockerfile -6
+- ```docker container run -d --name hd2 --e KULLANICI="Ozgur OZTURK" ozgurozturknet/hello-docker``` kullanıcı değişkenine container oluşturulurken değer atadık çünkü her container'ın HOSTNAME'i başka olur
+- ```docker image inspect ozgurozturknet/hello-docker``` ExposedPorts ve tanımlamadığım Env variable'lar var bunlar nginx:latest image'ından geliyor (girmediğim değerler base image'tan geliyor)
+#### ADD ve COPY Farkı
+- ADD dosya kaynağının bir url olmasına izin verir. Ayrıca ADD ile kaynak olarak bir .tar dosyayı belirtilirse bu dosya imaja .tar olarak sıkıştırılmış haliyle değil de açılarak kopyalanır. COPY ile uzaktaki bir yerden dosya kopyalayamıyorum ADD ile kopyalayabiliyorum. ADD uzaktaki bir .tar dosyasını kopyalarken sıkıştırılmış haliyle kopyalayabiliyor.
+- ```docker image build -t addcopy .``` ```docker run -it addcopy sh```
+#### ENTRYPOINT ve CMD Farkı
+- (bolum55 klasörüne geçmeyi unutma) ```docker image build -t javaimaj``` ```docker run javaimaj```
+- ```docker run javaimaj ls``` runtime'da overwrite ettim, cmd komutu içinde belirttiğimi runtime'da değiştirebiliyorum
+- entrypoint komutu ile girilen container oluşturulurken değiştirilemez
+- hem entrypoint hem cmd, docker cmd talimatına yazılanları entrypoint talimatına parametre olarak ekler (CMD'de girdiğimi runtime'da değiştirebildiğim için işe yarayacak)
+- ```docker image build -t pingimaj -f./Dockerfile.Centos . ``` ```docker run pingimaj``` Dockerfile.Centos```ENTRYPOINT["ping] CMD["127.0.0.1] ``` ```docker run pingimaj 8.8.8.8```
+- ```docker run ozgurozturknet/uygulama version2``` entrypoint ve cmd'yi bir arada kulllanarak böyle senaryolar oluşturabiliyoruz
+#### Exec Form ve Shell Form Farkı
+- ```CMD ["python", "app.py"]``` =exec form, ```CMD python app.py``` = shell form
+- Eğer komut Shell formunda girilirse bu imajdan container oluşturulduğu zaman bu komutu varsayılan shell'i çalıştırarak onun içerisinde çalıştırır. Bu nedenle container'da çalışan 1. process (pid 1) bu shell process olur
+- Eğer komut Exec formunda girildiyse herhangi bir shell çalıştırılmaz ve komut direkt **process** olarak çalışır. Container'ın pid 1'i o process olur
+- Exec formunda çalıştırılan komutlar herhangi bir shell processi çalışmadığı için Environment Variable gibi bazı değerlere erişemezler.
+- Eğer ENTRYPOINT ve CMD birlikte kullanılacaksa Exec form kullanılmalıdır. Shell formda CMD'deki komutlar ENTRPOINT'e parametre olarak aktarılmaz
+```
+docker image build -t execshell .
+docker container run --name exec execshell
+docker container run --name shell execshell  //ENV'in değerine erişebildim shell formunda
 ```
